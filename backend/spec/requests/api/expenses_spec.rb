@@ -51,7 +51,7 @@ RSpec.describe "Api::Expenses", type: :request do
     end
 
     context "with invalid parameters" do
-      it "with negative amounts" do
+      it "returns unprocessable entity with negative amounts" do
         invalid_params = {
           expense: {
             description: "Invalid expense",
@@ -63,12 +63,12 @@ RSpec.describe "Api::Expenses", type: :request do
 
         expect {
           post "/api/expenses", params: invalid_params, as: :json
-        }.to change(Expense, :count).by(1)
+        }.not_to change(Expense, :count)
 
-        expect(response).to have_http_status(:created)
+        expect(response).to have_http_status(:unprocessable_entity)
       end
 
-      it "with empty descriptions" do
+      it "returns unprocessable entity with empty descriptions" do
         invalid_params = {
           expense: {
             description: "",
@@ -80,9 +80,28 @@ RSpec.describe "Api::Expenses", type: :request do
 
         expect {
           post "/api/expenses", params: invalid_params, as: :json
-        }.to change(Expense, :count).by(1)
+        }.not_to change(Expense, :count)
 
-        expect(response).to have_http_status(:created)
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it "returns unprocessable entity when date is in the future" do
+        future_params = {
+          expense: {
+            description: "Future expense",
+            amount: 100.00,
+            category_id: food_category.id,
+            date: Date.today + 1.day
+          }
+        }
+
+        expect {
+          post "/api/expenses", params: future_params, as: :json
+        }.not_to change(Expense, :count)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        json = JSON.parse(response.body)
+        expect(json["errors"]).to include("Date cannot be in the future")
       end
     end
   end
