@@ -4,7 +4,8 @@
 
 import { Expense, ExpenseFormData } from "../types";
 
-const API_BASE_URL = "http://localhost:3000/api";
+const envUrl = (import.meta as any).env?.VITE_API_URL;
+const API_BASE_URL = `${envUrl || "http://localhost:3000"}/api`;
 
 /**
  * Fetch all expenses
@@ -74,15 +75,25 @@ export async function createCategory(
 /**
  * Create a new expense
  */
-export async function createExpense(data: ExpenseFormData): Promise<Expense> {
-  // Convert category name to category_id
-  const categories = await fetchCategories();
-  const category = categories.find((c) => c.name === data.category);
+export async function createExpense(
+  data: ExpenseFormData,
+  categoryList?: Array<{ id: number; name: string }>,
+): Promise<Expense> {
+  let categoryId: number | undefined;
+
+  if (categoryList) {
+    const found = categoryList.find((c) => c.name === data.category);
+    categoryId = found?.id;
+  } else {
+    const categories = await fetchCategories();
+    const found = categories.find((c) => c.name === data.category);
+    categoryId = found?.id;
+  }
 
   const expenseData = {
     description: data.description,
     amount: data.amount,
-    category_id: category?.id,
+    category_id: categoryId,
     date: data.date,
   };
 
@@ -107,12 +118,20 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
 export async function updateExpense(
   id: number,
   data: Partial<ExpenseFormData>,
+  categoryList?: Array<{ id: number; name: string }>,
 ): Promise<Expense> {
   let expenseData: Record<string, any> = { ...data };
   if (data.category) {
-    const categories = await fetchCategories();
-    const category = categories.find((c) => c.name === data.category);
-    expenseData.category_id = category?.id;
+    let categoryId: number | undefined;
+    if (categoryList) {
+      const found = categoryList.find((c) => c.name === data.category);
+      categoryId = found?.id;
+    } else {
+      const categories = await fetchCategories();
+      const found = categories.find((c) => c.name === data.category);
+      categoryId = found?.id;
+    }
+    expenseData.category_id = categoryId;
     delete expenseData.category;
   }
 
