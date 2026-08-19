@@ -4,7 +4,8 @@
 
 import { Expense, ExpenseFormData } from "../types";
 
-const API_BASE_URL = "http://localhost:3000/api";
+const envUrl = (import.meta as any).env?.VITE_API_URL;
+const API_BASE_URL = `${envUrl || "http://localhost:3000"}/api`;
 
 /**
  * Fetch all expenses
@@ -47,17 +48,52 @@ export async function fetchCategories(): Promise<
 }
 
 /**
+ * Create a new category
+ */
+export async function createCategory(
+  name: string,
+): Promise<{ id: number; name: string }> {
+  const response = await fetch(`${API_BASE_URL}/categories`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ category: { name } }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.errors
+      ? errorData.errors.join(", ")
+      : "Failed to create category";
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+/**
  * Create a new expense
  */
-export async function createExpense(data: ExpenseFormData): Promise<Expense> {
-  // Convert category name to category_id
-  const categories = await fetchCategories();
-  const category = categories.find((c) => c.name === data.category);
+export async function createExpense(
+  data: ExpenseFormData,
+  categoryList?: Array<{ id: number; name: string }>,
+): Promise<Expense> {
+  let categoryId: number | undefined;
+
+  if (categoryList) {
+    const found = categoryList.find((c) => c.name === data.category);
+    categoryId = found?.id;
+  } else {
+    const categories = await fetchCategories();
+    const found = categories.find((c) => c.name === data.category);
+    categoryId = found?.id;
+  }
 
   const expenseData = {
     description: data.description,
     amount: data.amount,
-    category_id: category?.id,
+    category_id: categoryId,
     date: data.date,
   };
 
@@ -82,13 +118,29 @@ export async function createExpense(data: ExpenseFormData): Promise<Expense> {
 export async function updateExpense(
   id: number,
   data: Partial<ExpenseFormData>,
+  categoryList?: Array<{ id: number; name: string }>,
 ): Promise<Expense> {
+  let expenseData: Record<string, any> = { ...data };
+  if (data.category) {
+    let categoryId: number | undefined;
+    if (categoryList) {
+      const found = categoryList.find((c) => c.name === data.category);
+      categoryId = found?.id;
+    } else {
+      const categories = await fetchCategories();
+      const found = categories.find((c) => c.name === data.category);
+      categoryId = found?.id;
+    }
+    expenseData.category_id = categoryId;
+    delete expenseData.category;
+  }
+
   const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ expense: data }),
+    body: JSON.stringify({ expense: expenseData }),
   });
 
   if (!response.ok) {

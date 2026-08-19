@@ -2,17 +2,20 @@
  * Form component for adding/editing expenses
  */
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ExpenseFormData } from "../types";
 import { EXPENSE_CATEGORIES } from "../constants/categories";
 import { TextField, SelectBox, Button } from "../vibes";
 import { useExpenseForm } from "../hooks/useExpenseForm";
+import { fetchCategories } from "../services/api";
+import { formatDate } from "../utils/expenseUtils";
 
 interface ExpenseFormProps {
   initialData?: Partial<ExpenseFormData>;
   onSubmit: (data: ExpenseFormData) => Promise<void>;
   onCancel?: () => void;
   submitLabel?: string;
+  categories?: string[];
 }
 
 export function ExpenseForm({
@@ -20,12 +23,31 @@ export function ExpenseForm({
   onSubmit,
   onCancel,
   submitLabel = "Add Expense",
+  categories: categoriesProp,
 }: ExpenseFormProps) {
   const { formData, errors, isSubmitting, handleChange, handleSubmit } =
     useExpenseForm({
       initialData,
       onSubmit,
     });
+
+  const [categoryList, setCategoryList] = useState<string[]>(
+    categoriesProp || Array.from(EXPENSE_CATEGORIES),
+  );
+
+  useEffect(() => {
+    if (categoriesProp) {
+      setCategoryList(categoriesProp);
+    } else {
+      fetchCategories()
+        .then((cats) => {
+          if (cats && cats.length > 0) {
+            setCategoryList(cats.map((c) => c.name));
+          }
+        })
+        .catch((err) => console.error("Failed to load categories:", err));
+    }
+  }, [categoriesProp]);
 
   const formStyle: React.CSSProperties = {
     display: "flex",
@@ -39,7 +61,7 @@ export function ExpenseForm({
     marginTop: "0.5rem",
   };
 
-  const categoryOptions = EXPENSE_CATEGORIES.map((category) => ({
+  const categoryOptions = categoryList.map((category) => ({
     value: category,
     label: category,
   }));
@@ -82,6 +104,7 @@ export function ExpenseForm({
       <TextField
         label="Date"
         type="date"
+        max={formatDate(new Date())}
         value={formData.date}
         onChange={(e) => handleChange("date", e.target.value)}
         error={errors.date}
